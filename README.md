@@ -1,46 +1,51 @@
-# Tweet Filter AI Chrome Extension
+# 🤖 Tweet Filter AI
 
-A Chrome extension that uses GPT-4 to filter tweets on X.com (formerly Twitter) based on custom conditions.
+A smart Chrome extension that uses GPT-4o-mini to clean up your X/Twitter feed based on what you actually want to see.
 
-## Features
+## ✨ What it Does
 
-- Filter tweets in real-time using GPT-4
-- Custom filter conditions that you can set and update
-- Automatic processing of new tweets as they appear
-- Local storage of filter decisions for performance
-- Simple and clean UI
+- Uses GPT-4 to filter tweets in real-time
+- You set the rules, it does the work
+- Learns and remembers what it filtered before (for speed)
+- Clean, simple interface
+- Works automatically as you scroll
 
-## Installation
+## 🚀 Getting Started
 
-1. Clone this repository or download the files
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the directory containing these files
+1. Grab the code (clone or download)
+2. Head to `chrome://extensions/`
+3. Toggle on "Developer mode" (top right)
+4. Hit "Load unpacked" and pick the folder with these files
 
-## Setup
+## 🔑 Quick Setup
 
-1. Get an OpenAI API key from [OpenAI's platform](https://platform.openai.com/)
-2. Click the extension icon in Chrome
-3. Enter your OpenAI API key
-4. Set your filter condition (e.g., "Remove tweets that are promotional or contain spam")
-5. Click "Save Settings"
+1. Snag an API key from [OpenAI](https://platform.openai.com/)
+2. Click the extension icon
+3. Pop in your API key
+4. Write your filter rules
+5. Hit save and you're good to go!
 
-## Usage
+## 🎮 How to Use
 
-1. Go to X.com (Twitter)
-2. The extension will automatically start filtering tweets based on your condition
-3. Filtered tweets will be hidden from view
-4. You can update your filter condition at any time by clicking the extension icon
+Just:
+1. Go to X.com
+2. Start scrolling - the extension works automatically
+3. Want to change the rules? Click the extension icon anytime. Rules will be applied to any new tweets you see.
 
-## Notes
+## 🔒 Privacy Stuff
 
-- The extension uses the GPT-4 model for classification
-- API calls are made directly from the extension to OpenAI
-- Your API key and filter conditions are stored locally in Chrome storage
-- Hidden tweets can be revealed by refreshing the page
+- Your API key stays in Chrome's secure storage
+- We only talk to OpenAI's API - no other servers
+- Everything happens on your machine
+- Hidden tweets come back if you refresh
 
-## Privacy & Security
+## 📝 Example Rules
 
-- Your OpenAI API key is stored locally in Chrome's secure storage
-- No data is sent to any servers except OpenAI's API
-- Tweet content is only processed locally and through OpenAI's API
+Here's a solid ruleset for tech and startup content:
+
+Please only keep tweets that topics include at least one of any of these:
+- AI / Machine Learning / LLMs / Agents / Robots / Generative AI / chatbots / or anything related
+- startups
+- entrepreneurship
+- coding
+- any of these companies: OpenAI, Anthropic, Mistral, Groq, Grok, Cohere, Gemini / Google, MetaAI, Cursor, Bolt, Codium, Y Combinator, Nvidia, Notion

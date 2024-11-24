@@ -69,128 +69,125 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 function startTweetProcessing() {
-  // Only run on home timeline
   if (!isHomeTimeline()) {
     console.log('[Tweet Filter] Not on home timeline, extension inactive');
     return;
   }
 
-  // Initial processing
+  // Process initial tweets
   processTweets();
   
-  // Process tweets on scroll (throttled)
-  window.addEventListener('scroll', throttle(() => {
-    if (!isHomeTimeline()) return;
-    processTweets();
-  }, 250));
+  // Set up a single observer for both scroll and DOM changes
+  const processThrottled = throttle(processTweets, 50);
   
-  // Set up observer for new tweets
-  const tweetObserver = new MutationObserver(throttle(() => {
-    if (!isHomeTimeline()) return;
-    processTweets();
-  }, 250));
-  
-  // Start observing the timeline
-  observeTimeline(tweetObserver);
-}
-
-function observeTimeline(observer) {
-  const timelineSelector = 'div[data-testid="primaryColumn"]';
-  const checkTimeline = setInterval(() => {
-    const timeline = document.querySelector(timelineSelector);
-    if (timeline) {
-      clearInterval(checkTimeline);
-      observer.observe(timeline, {
-        childList: true,
-        subtree: true
-      });
-    }
-  }, 1000);
-}
-
-async function processTweets() {
-  // Get only tweets that are in or below the viewport and not processed
-  const tweets = Array.from(document.querySelectorAll('article[data-testid="tweet"]:not([data-processed="true"])'))
-    .filter(tweet => {
-      const rect = tweet.getBoundingClientRect();
-      // Process tweets that start at or below the viewport bottom
-      return rect.top <= window.innerHeight * 3; // Process up to 3 viewport heights below
-    });
-  
-  let newClassifications = 0;
-  
-  // Sort tweets by position (top to bottom) to process them in order
-  tweets.sort((a, b) => {
-    const rectA = a.getBoundingClientRect();
-    const rectB = b.getBoundingClientRect();
-    return rectA.top - rectB.top;
+  // Handle scroll events
+  window.addEventListener('scroll', () => {
+    if (isHomeTimeline()) processThrottled();
   });
   
-  for (const tweet of tweets) {
-    try {
-      // Mark tweet as processed
-      tweet.setAttribute('data-processed', 'true');
-      
-      // Extract tweet text
-      const tweetText = extractTweetText(tweet);
-      if (!tweetText) continue;
-      
-      // Check cache first
-      const cachedResult = tweetCache.get(tweetText);
-      if (cachedResult !== undefined) {
-        console.log(`[Tweet Filter] Cached Result:
-Tweet: "${tweetText}"
-Decision: ${cachedResult ? 'KEEP' : 'REMOVE'}`);
-        applyFilterAction(tweet, cachedResult);
-        continue;
-      }
+  // Set up mutation observer
+  const tweetObserver = new MutationObserver((mutations) => {
+    if (isHomeTimeline()) processThrottled();
+  });
+  
+  // Start observing with a more reliable setup
+  setupTimelineObserver(tweetObserver);
+}
 
-      // Check if we're already classifying this tweet
-      if (pendingClassifications.has(tweetText)) {
-        console.log(`[Tweet Filter] Classification in progress for: "${tweetText}"`);
-        const decision = await pendingClassifications.get(tweetText);
-        applyFilterAction(tweet, decision);
-        continue;
+function setupTimelineObserver(observer) {
+  const timelineSelector = 'div[data-testid="primaryColumn"]';
+  const timeline = document.querySelector(timelineSelector);
+  
+  if (timeline) {
+    observer.observe(timeline, {
+      childList: true,
+      subtree: true
+    });
+  } else {
+    // If timeline isn't ready, wait for it using MutationObserver instead of setInterval
+    const bodyObserver = new MutationObserver((mutations, obs) => {
+      const timeline = document.querySelector(timelineSelector);
+      if (timeline) {
+        observer.observe(timeline, {
+          childList: true,
+          subtree: true
+        });
+        obs.disconnect(); // Stop observing body once timeline is found
       }
-      
-      // Create promise for this classification
-      const classificationPromise = classifyTweet(tweetText);
-      pendingClassifications.set(tweetText, classificationPromise);
-      
-      // Classify tweet
-      const shouldKeep = await classificationPromise;
-      pendingClassifications.delete(tweetText); // Remove from pending after completion
-      newClassifications++;
-      
-      // Cache the result
-      tweetCache.set(tweetText, shouldKeep);
-      
-      // Save to storage (force save if we've processed many new tweets)
-      saveCache(newClassifications >= CACHE_SAVE_THRESHOLD);
-      
-      // Log the result
-      console.log(`[Tweet Filter] New Classification:
-Tweet: "${tweetText}"
-Decision: ${shouldKeep ? 'KEEP' : 'REMOVE'}`);
-      
-      // Apply the filter action
-      applyFilterAction(tweet, shouldKeep);
-    } catch (error) {
-      console.error('Error processing tweet:', error);
-      // Clean up pending classification on error
-      if (tweetText) {
-        pendingClassifications.delete(tweetText);
-      }
-    }
+    });
+    
+    bodyObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 }
 
+async function processTweets() {
+  const tweets = Array.from(document.querySelectorAll('article[data-testid="tweet"]:not([data-processed="true"])'))
+    .filter(tweet => {
+      const rect = tweet.getBoundingClientRect();
+      return rect.top <= window.innerHeight * 2;
+    })
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+
+  const processPromises = tweets.map(async (tweet) => {
+    try {
+      tweet.setAttribute('data-processed', 'true');
+      
+      const tweetData = extractTweetText(tweet);
+      if (!tweetData.text) return;
+
+      // Create a cache key combining username and text
+      const cacheKey = `${tweetData.username}:${tweetData.text}`;
+
+      // Use cached result if available
+      const cachedResult = tweetCache.get(cacheKey);
+      if (cachedResult !== undefined) {
+        applyFilterAction(tweet, cachedResult);
+        return;
+      }
+
+      // Use existing classification promise if available
+      if (pendingClassifications.has(cacheKey)) {
+        const decision = await pendingClassifications.get(cacheKey);
+        applyFilterAction(tweet, decision);
+        return;
+      }
+
+      // Create new classification promise
+      const classificationPromise = classifyTweet(tweetData);
+      pendingClassifications.set(cacheKey, classificationPromise);
+
+      const shouldKeep = await classificationPromise;
+      pendingClassifications.delete(cacheKey);
+      
+      console.log(`[Tweet Filter] New classification for @${tweetData.username}: "${tweetData.text.slice(0, 300)}..." -> ${shouldKeep ? 'keep' : 'remove'}`);
+      
+      tweetCache.set(cacheKey, shouldKeep);
+      saveCache();
+      
+      applyFilterAction(tweet, shouldKeep);
+    } catch (error) {
+      console.error('Error processing tweet:', error);
+      const cacheKey = tweetData ? `${tweetData.username}:${tweetData.text}` : null;
+      if (cacheKey) pendingClassifications.delete(cacheKey);
+    }
+  });
+
+  await Promise.all(processPromises);
+}
 function extractTweetText(tweetElement) {
   const textElement = tweetElement.querySelector('div[data-testid="tweetText"]');
-  return textElement ? textElement.textContent.trim() : '';
+  const usernameElement = tweetElement.querySelector('div[data-testid="User-Name"] div');
+  
+  const text = textElement ? textElement.textContent.trim() : '';
+  const username = usernameElement ? usernameElement.textContent.trim() : '';
+  
+  return { text, username };
 }
 
-async function classifyTweet(tweetText) {
+async function classifyTweet(tweetData) {
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -207,7 +204,10 @@ async function classifyTweet(tweetText) {
           },
           {
             role: 'user',
-            content: `<tweet>${tweetText}</tweet>`
+            content: `<tweet>
+              <username>${tweetData.username}</username>
+              <content>${tweetData.text}</content>
+            </tweet>`
           }
         ],
         response_format: {

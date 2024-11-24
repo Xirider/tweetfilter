@@ -39,6 +39,10 @@ document.addEventListener('DOMContentLoaded', function() {
 function showStatus(message, type) {
   const status = document.getElementById('status');
   status.textContent = message;
-  status.style.backgroundColor = type === 'error' ? '#ffebee' : '#e8f5e9';
-  status.style.color = type === 'error' ? '#c62828' : '#2e7d32';
+  status.className = `status show ${type}`;
+  
+  // Hide the status message after 3 seconds
+  setTimeout(() => {
+    status.className = 'status';
+  }, 3000);
 } 

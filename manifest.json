@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Tweet Filter AI",
+  "version": "1.0",
+  "description": "Filter tweets using GPT-4 based on custom conditions",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://api.openai.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [{
+    "matches": ["https://x.com/*", "https://twitter.com/*"],
+    "js": ["content.js"]
+  }]
+} 

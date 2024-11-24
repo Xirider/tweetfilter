@@ -4,6 +4,11 @@ const pendingClassifications = new Map(); // Track in-flight requests
 let pendingCacheSaves = 0;
 const CACHE_SAVE_THRESHOLD = 10; // Force save after 10 new classifications
 
+// Check if we're on the home timeline
+function isHomeTimeline() {
+  return window.location.pathname === '/home';
+}
+
 // Load cache from storage on startup
 chrome.storage.local.get(['tweetClassifications'], function(result) {
   if (result.tweetClassifications) {
@@ -64,11 +69,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 function startTweetProcessing() {
+  // Only run on home timeline
+  if (!isHomeTimeline()) {
+    console.log('[Tweet Filter] Not on home timeline, extension inactive');
+    return;
+  }
+
   // Initial processing
   processTweets();
   
+  // Process tweets on scroll (throttled)
+  window.addEventListener('scroll', throttle(() => {
+    if (!isHomeTimeline()) return;
+    processTweets();
+  }, 250));
+  
   // Set up observer for new tweets
-  const tweetObserver = new MutationObserver(debounce(processTweets, 50));
+  const tweetObserver = new MutationObserver(throttle(() => {
+    if (!isHomeTimeline()) return;
+    processTweets();
+  }, 250));
   
   // Start observing the timeline
   observeTimeline(tweetObserver);
@@ -89,8 +109,22 @@ function observeTimeline(observer) {
 }
 
 async function processTweets() {
-  const tweets = document.querySelectorAll('article[data-testid="tweet"]:not([data-processed="true"])');
+  // Get only tweets that are in or below the viewport and not processed
+  const tweets = Array.from(document.querySelectorAll('article[data-testid="tweet"]:not([data-processed="true"])'))
+    .filter(tweet => {
+      const rect = tweet.getBoundingClientRect();
+      // Process tweets that start at or below the viewport bottom
+      return rect.top <= window.innerHeight * 3; // Process up to 3 viewport heights below
+    });
+  
   let newClassifications = 0;
+  
+  // Sort tweets by position (top to bottom) to process them in order
+  tweets.sort((a, b) => {
+    const rectA = a.getBoundingClientRect();
+    const rectB = b.getBoundingClientRect();
+    return rectA.top - rectB.top;
+  });
   
   for (const tweet of tweets) {
     try {
@@ -144,7 +178,6 @@ Decision: ${shouldKeep ? 'KEEP' : 'REMOVE'}`);
     } catch (error) {
       console.error('Error processing tweet:', error);
       // Clean up pending classification on error
-      const tweetText = extractTweetText(tweet);
       if (tweetText) {
         pendingClassifications.delete(tweetText);
       }
@@ -213,7 +246,15 @@ async function classifyTweet(tweetText) {
 
 function applyFilterAction(tweetElement, shouldKeep) {
   if (!shouldKeep) {
-    tweetElement.style.display = 'none';
+    // Instead of display: none, we'll make it invisible but maintain its space
+    tweetElement.style.visibility = 'hidden';
+    tweetElement.style.minHeight = '0';
+    tweetElement.style.height = '0';
+    tweetElement.style.margin = '0';
+    tweetElement.style.padding = '0';
+    tweetElement.style.overflow = 'hidden';
+    // Add transition for smoother height change
+    tweetElement.style.transition = 'height 0.2s ease-out, margin 0.2s ease-out, padding 0.2s ease-out';
   }
 }
 
@@ -236,4 +277,16 @@ function debounce(func, wait) {
   };
   
   return debounced;
-} 
+}
+
+// Throttle the scroll event handler
+const throttle = (func, limit) => {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}; 

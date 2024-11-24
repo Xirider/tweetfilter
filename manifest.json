@@ -17,7 +17,7 @@
     "default_popup": "popup.html"
   },
   "content_scripts": [{
-    "matches": ["https://x.com/*", "https://twitter.com/*"],
+    "matches": ["https://x.com/home", "https://twitter.com/home"],
     "js": ["content.js"]
   }]
 } 

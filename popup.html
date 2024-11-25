@@ -12,37 +12,48 @@
         --radius: 16px;
       }
 
-      html {
+      html,
+      body {
+        margin: 0;
+        padding: 0;
         background: var(--bg);
-        border-radius: var(--radius);
-        height: 100%;
+        height: 600px;
+        width: 340px;
       }
 
       body {
-        width: 340px;
-        height: 600px;
-        padding: 24px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           sans-serif;
-        background: var(--bg);
         color: var(--text);
-        margin: 0;
-        border-radius: var(--radius);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-        /* Smooth edges */
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        overflow-y: auto;
-        max-height: 600px;
-        position: relative;
-        box-sizing: border-box;
+        overflow: hidden;
       }
 
       .container {
+        height: 100%;
+        overflow-y: auto;
+        padding: 24px;
         display: flex;
         flex-direction: column;
         gap: 16px;
-        border-radius: var(--radius);
+        box-sizing: border-box;
+      }
+
+      /* Customize scrollbar */
+      .container::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .container::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+
+      .container::-webkit-scrollbar-thumb:hover {
+        background: #d0d0d0;
       }
 
       h2 {
@@ -82,8 +93,8 @@
       }
 
       textarea {
-        height: 300px;
-        resize: vertical;
+        height: 200px;
+        resize: none;
         line-height: 1.5;
       }
 
@@ -129,11 +140,102 @@
         background-color: #ffe9e9;
         color: #842029;
       }
+
+      .toggle-group {
+        display: flex;
+        align-items: center;
+      }
+
+      .switch-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+      }
+
+      .slider.round {
+        border-radius: 24px;
+      }
+
+      .slider.round:before {
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: var(--primary);
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+
+      .stats-group {
+        background: #f7f9f9;
+        padding: 12px;
+        border-radius: var(--radius);
+      }
+
+      .time-saved {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--primary);
+        margin-top: 4px;
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <h2>Tweet Filter AI</h2>
+
+      <div class="input-group toggle-group">
+        <label class="switch-label">
+          <span>Enable Filtering</span>
+          <label class="switch">
+            <input type="checkbox" id="enableFilter" />
+            <span class="slider round"></span>
+          </label>
+        </label>
+      </div>
+
+      <div class="stats-group">
+        <label>Time Saved</label>
+        <div id="timeSaved" class="time-saved">0 minutes</div>
+      </div>
 
       <div class="input-group">
         <label for="apiKey">OpenAI API Key</label>

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tweet Filter AI",
   "version": "1.0",
-  "description": "Filter tweets using GPT-4 based on custom conditions",
+  "description": "Smart AI-powered tweet filtering based on your preferences",
   "permissions": [
     "storage",
     "activeTab",
@@ -14,10 +14,22 @@
     "https://api.openai.com/*"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png", 
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "content_scripts": [{
     "matches": ["https://x.com/home", "https://twitter.com/home"],
     "js": ["content.js"]
-  }]
+  }],
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
 } 

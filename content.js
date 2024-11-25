@@ -1,24 +1,80 @@
+// Add hash function at the top
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(36); // Convert to base36 for shorter string
+}
+
 // Cache for storing classification results
 const tweetCache = new Map();
 const pendingClassifications = new Map(); // Track in-flight requests
 let pendingCacheSaves = 0;
 const CACHE_SAVE_THRESHOLD = 10; // Force save after 10 new classifications
 
-// Check if we're on the home timeline
-function isHomeTimeline() {
-  return window.location.pathname === '/home';
-}
+// Initialize settings
+let settings = {
+  apiKey: '',
+  filterCondition: '',
+  isEnabled: true // Default to enabled
+};
 
-// Load cache from storage on startup
-chrome.storage.local.get(['tweetClassifications'], function(result) {
+// Load settings when content script starts
+chrome.storage.local.get(['apiKey', 'filterCondition', 'isEnabled', 'tweetClassifications'], function(result) {
+  settings = {
+    apiKey: result.apiKey || '',
+    filterCondition: result.filterCondition || '',
+    isEnabled: result.isEnabled === undefined ? true : result.isEnabled
+  };
+  
+  if (settings.apiKey && settings.filterCondition && settings.isEnabled) {
+    startTweetProcessing();
+  }
+  
+  // Load cache
   if (result.tweetClassifications) {
     const storedCache = JSON.parse(result.tweetClassifications);
-    Object.entries(storedCache).forEach(([text, decision]) => {
-      tweetCache.set(text, decision);
+    Object.entries(storedCache).forEach(([hash, decision]) => {
+      tweetCache.set(hash, decision);
     });
     console.log(`[Tweet Filter] Loaded ${tweetCache.size} cached classifications`);
   }
 });
+
+// Listen for settings updates
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'SETTINGS_UPDATED') {
+    chrome.storage.local.get(['apiKey', 'filterCondition', 'isEnabled'], function(result) {
+      settings = {
+        apiKey: result.apiKey || '',
+        filterCondition: result.filterCondition || '',
+        isEnabled: result.isEnabled === undefined ? true : result.isEnabled
+      };
+      
+      if (settings.apiKey && settings.filterCondition && settings.isEnabled) {
+        startTweetProcessing();
+      } else if (!settings.isEnabled) {
+        // If disabled, show all hidden tweets
+        document.querySelectorAll('article[data-testid="tweet"][data-processed="true"]').forEach(tweet => {
+          tweet.style.visibility = '';
+          tweet.style.height = '';
+          tweet.style.margin = '';
+          tweet.style.padding = '';
+          tweet.style.minHeight = '';
+          tweet.style.overflow = '';
+        });
+      }
+    });
+  }
+});
+
+// Check if we're on the home timeline
+function isHomeTimeline() {
+  return window.location.pathname === '/home';
+}
 
 // Save cache to storage
 const saveCacheToStorage = debounce(() => {
@@ -40,33 +96,6 @@ function saveCache(force = false) {
     saveCacheToStorage();
   }
 }
-
-
-// Initialize settings
-let settings = {
-  apiKey: '',
-  filterCondition: ''
-};
-
-// Load settings when content script starts
-chrome.storage.local.get(['apiKey', 'filterCondition'], function(result) {
-  settings = result;
-  if (settings.apiKey && settings.filterCondition) {
-    startTweetProcessing();
-  }
-});
-
-// Listen for settings updates
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'SETTINGS_UPDATED') {
-    chrome.storage.local.get(['apiKey', 'filterCondition'], function(result) {
-      settings = result;
-      if (settings.apiKey && settings.filterCondition) {
-        startTweetProcessing();
-      }
-    });
-  }
-});
 
 function startTweetProcessing() {
   if (!isHomeTimeline()) {
@@ -124,6 +153,8 @@ function setupTimelineObserver(observer) {
 }
 
 async function processTweets() {
+  if (!settings.isEnabled) return;
+  
   const tweets = Array.from(document.querySelectorAll('article[data-testid="tweet"]:not([data-processed="true"])'))
     .filter(tweet => {
       const rect = tweet.getBoundingClientRect();
@@ -138,8 +169,8 @@ async function processTweets() {
       const tweetData = extractTweetText(tweet);
       if (!tweetData.text) return;
 
-      // Create a cache key combining username and text
-      const cacheKey = `${tweetData.username}:${tweetData.text}`;
+      // Create a hash of username and text
+      const cacheKey = hashString(`${tweetData.username}:${tweetData.text}`);
 
       // Use cached result if available
       const cachedResult = tweetCache.get(cacheKey);
@@ -162,7 +193,7 @@ async function processTweets() {
       const shouldKeep = await classificationPromise;
       pendingClassifications.delete(cacheKey);
       
-      console.log(`[Tweet Filter] New classification for @${tweetData.username}: "${tweetData.text.slice(0, 300)}..." -> ${shouldKeep ? 'keep' : 'remove'}`);
+      console.log(`[Tweet Filter] New classification for @${tweetData.username}: "${tweetData.text.slice(0, 50)}..." -> ${shouldKeep ? 'keep' : 'remove'}`);
       
       tweetCache.set(cacheKey, shouldKeep);
       saveCache();
@@ -170,7 +201,7 @@ async function processTweets() {
       applyFilterAction(tweet, shouldKeep);
     } catch (error) {
       console.error('Error processing tweet:', error);
-      const cacheKey = tweetData ? `${tweetData.username}:${tweetData.text}` : null;
+      const cacheKey = tweetData ? hashString(`${tweetData.username}:${tweetData.text}`) : null;
       if (cacheKey) pendingClassifications.delete(cacheKey);
     }
   });
@@ -200,7 +231,7 @@ async function classifyTweet(tweetData) {
         messages: [
           {
             role: 'system',
-            content: `You are a tweet classifier. Analyze the tweet and determine if it should be kept or removed based on this condition: ${settings.filterCondition}`
+            content: `You are a tweet classifier. Analyze the tweet and determine if it should be kept or removed based on these conditions: <conditions>${settings.filterCondition}</conditions>`
           },
           {
             role: 'user',

@@ -4,7 +4,7 @@ A smart Chrome extension that uses GPT-4o-mini to clean up your X/Twitter feed b
 
 ## ✨ What it Does
 
-- Uses GPT-4 to filter tweets in real-time
+- Uses GPT-4o-mini to filter tweets in real-time
 - You set the rules, it does the work
 - Learns and remembers what it filtered before (for speed)
 - Clean, simple interface
@@ -34,18 +34,20 @@ Just:
 
 ## 🔒 Privacy Stuff
 
-- Your API key stays in Chrome's secure storage
+- Your API key stays in Chrome's secure storage locally
 - We only talk to OpenAI's API - no other servers
 - Everything happens on your machine
 - Hidden tweets come back if you refresh
 
 ## 📝 Example Rules
 
-Here's a solid ruleset for tech and startup content:
+Here's a solid ruleset for AI and startup content:
 
+```
 Please only keep tweets that topics include at least one of any of these:
 - AI / Machine Learning / LLMs / Agents / Robots / Generative AI / chatbots / or anything related
 - startups
 - entrepreneurship
 - coding
 - any of these companies: OpenAI, Anthropic, Mistral, Groq, Grok, Cohere, Gemini / Google, MetaAI, Cursor, Bolt, Codium, Y Combinator, Nvidia, Notion
+```

@@ -97,11 +97,40 @@ function saveCache(force = false) {
   }
 }
 
+// Add URL change detection
+let lastUrl = location.href;
+new MutationObserver(() => {
+  const url = location.href;
+  if (url !== lastUrl) {
+    lastUrl = url;
+    handleUrlChange();
+  }
+}).observe(document, {subtree: true, childList: true});
+
+// Handle URL changes
+function handleUrlChange() {
+  if (isHomeTimeline()) {
+    console.log('[Tweet Filter] Detected navigation to home timeline');
+    if (settings.apiKey && settings.filterCondition && settings.isEnabled) {
+      // Reset processed state of tweets
+      document.querySelectorAll('article[data-testid="tweet"][data-processed="true"]').forEach(tweet => {
+        tweet.removeAttribute('data-processed');
+      });
+      startTweetProcessing();
+    }
+  }
+}
+
 function startTweetProcessing() {
   if (!isHomeTimeline()) {
     console.log('[Tweet Filter] Not on home timeline, extension inactive');
     return;
   }
+
+  // Reset processed state of tweets before processing
+  document.querySelectorAll('article[data-testid="tweet"][data-processed="true"]').forEach(tweet => {
+    tweet.removeAttribute('data-processed');
+  });
 
   // Process initial tweets
   processTweets();
